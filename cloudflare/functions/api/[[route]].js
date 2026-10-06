@@ -229,15 +229,25 @@ async function maybeBackup(db) {
 /* ---------- 路由（按 /api 之后的路径分发） ---------- */
 export async function onRequest(context) {
   const { request, params, env } = context;
-  const db = env.DB;
-  await ensureSchema(db);
-
-  const method = request.method;
-  const seg = (params.route || '').split('/').filter(Boolean); // ['items','123','takeout']
-
+  // 整段包 try/catch，异常一律以 JSON 返回，避免 Error 1101 白屏
   try {
+    const db = env.DB;
+    if (!db) {
+      // 绑定没生效时给出一句话提示，方便排查
+      console.error('D1 binding "DB" not found. env keys =', Object.keys(env || {}));
+      return json({
+        error: 'D1 binding not found',
+        message: '未找到 D1 绑定 DB。请到 Pages 项目 Settings → Functions → D1 database bindings 添加：变量名 DB → 选 warehouse，然后 Redeploy。',
+        envKeys: Object.keys(env || {}),
+      }, 500);
+    }
+    await ensureSchema(db);
+
+    const method = request.method;
+    const seg = (params.route || '').split('/').filter(Boolean); // ['items','123','takeout']
+
     // 健康检查 / 根
-    if (seg.length === 0) return json({ ok: true, msg: 'warehouse api' });
+    if (seg.length === 0) return json({ ok: true, msg: 'warehouse api', db: 'ok' });
 
     // GET /api/state
     if (seg.length === 1 && seg[0] === 'state' && method === 'GET') return json(await getState(db));
@@ -284,6 +294,12 @@ export async function onRequest(context) {
 
     return json({ error: 'Not Found' }, 404);
   } catch (e) {
-    return json({ error: e.message || '服务器错误' }, 500);
+    // 任何未预期异常都打成 JSON 返回，并打印到 Workers Logs 便于后台排查
+    console.error('onRequest error:', e && (e.stack || e.message || String(e)));
+    return json({
+      error: '服务器错误',
+      message: (e && e.message) || String(e),
+      stack: (e && e.stack) || '',
+    }, 500);
   }
 }
