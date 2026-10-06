@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>仓储系统 · 仓库管理系统</title>
+
+<!-- 统计页画图用的库（需联网）。 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- 导出 Excel 用的库（需联网）。 -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+<style>
+  /* =========================================================
+     黑白灰色调 · 无细线边框 · 悬停/点按动态浮起。
+     改颜色改下面 :root 变量即可。
+     ========================================================= */
+  :root{
+    --primary:#1f2937;     /* 近黑（主色） */
+    --primary-dark:#111827;
+    --bg:#ececec;          /* 浅灰背景 */
+    --card:#ffffff;
+    --text:#222222;
+    --muted:#6b7280;
+    --line:#e5e7eb;        /* 保留变量，但界面已基本不用边框 */
+    --danger:#444444;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:#dfe4ec;color:var(--text);
+  }
+
+  /* —— 手机外壳：桌面预览像手机，真机全屏 —— */
+  .phone{
+    max-width:430px;margin:0 auto;min-height:100vh;background:var(--bg);
+    display:flex;flex-direction:column;position:relative;overflow:hidden;
+  }
+  @media(min-width:480px){
+    body{padding:24px 0;}
+    .phone{border-radius:36px;box-shadow:0 14px 50px rgba(0,0,0,.25);
+           min-height:880px;max-height:880px;border:10px solid #111;overflow:hidden;}
+  }
+
+  /* —— 顶部栏 —— */
+  header{
+    flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px;background:var(--primary);color:#fff;
+  }
+  header .brand{font-size:17px;font-weight:600;}
+  header .top-actions{display:flex;gap:6px;}
+  header .top-actions button{
+    width:40px;height:40px;border:none;border-radius:50%;background:rgba(255,255,255,.16);
+    color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    transition:background .15s, transform .15s;
+  }
+  header .top-actions button:active{background:rgba(255,255,255,.32);transform:scale(.92);}
+
+  /* —— 中间内容区 —— */
+  main{flex:1;overflow-y:auto;padding:14px 14px 90px;}
+  .page{display:none;}
+  .page.active{display:block;}
+
+  /* —— 卡片（无边框，靠底色+阴影区分） —— */
+  .card{background:var(--card);border:none;border-radius:var(--radius);padding:14px;margin-bottom:12px;
+        box-shadow:0 1px 3px rgba(0,0,0,.06);transition:transform .15s, box-shadow .15s;}
+  .card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.12);}
+  .section-title{font-size:15px;font-weight:600;margin:4px 2px 10px;}
+
+  /* —— 表单（无边框，灰底输入，聚焦时浮起） —— */
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px;}
+  input,select,textarea{
+    width:100%;padding:11px 12px;font-size:16px;
+    border:none;border-radius:10px;background:#f3f4f6;color:var(--text);
+    transition:box-shadow .15s, transform .15s;
+  }
+  input:hover,select:hover,textarea:hover{box-shadow:0 0 0 2px rgba(31,41,55,.22);}
+  input:focus,select:focus,textarea:focus{outline:none;box-shadow:0 0 0 2px var(--primary);}
+  .required{color:var(--danger);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+
+  /* —— 物品卡片网格（无边框，悬停浮起） —— */
+  .items{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .item{background:var(--card);border:none;border-radius:var(--radius);padding:12px;cursor:pointer;
+        box-shadow:0 1px 3px rgba(0,0,0,.06);transition:transform .15s, box-shadow .15s;}
+  .item:hover,.item:active{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.14);}
+  .item .code{font-weight:600;font-size:15px;}
+  .item .wh{color:var(--primary);font-size:13px;margin-top:2px;}
+  .item .meta{color:var(--muted);font-size:12px;margin-top:4px;}
+  .item img{width:100%;max-height:80px;object-fit:cover;border-radius:8px;margin-top:6px;}
+
+  /* —— 按钮（无边框，悬停浮起） —— */
+  .btn{display:inline-block;border:none;border-radius:10px;padding:12px 18px;font-size:16px;
+       cursor:pointer;background:var(--primary);color:#fff;transition:transform .15s, box-shadow .15s;}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.18);}
+  .btn:active{background:var(--primary-dark);transform:translateY(0);}
+  .btn.ghost{background:#f0f0f0;color:var(--primary);border:none;}
+  .btn.danger{background:var(--danger);}
+  .btn.sm{padding:8px 14px;font-size:14px;}
+
+  /* —— 底部导航（5 项，中间 + 悬浮按钮） —— */
+  .bottom-nav{
+    flex-shrink:0;position:absolute;left:0;right:0;bottom:0;
+    display:grid;grid-template-columns:repeat(5,1fr);align-items:center;
+    background:var(--card);border-top:none;box-shadow:0 -2px 12px rgba(0,0,0,.08);padding:6px 0 10px;
+  }
+  .bottom-nav button{
+    border:none;background:none;color:var(--muted);font-size:11px;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;
+    transition:transform .15s, color .15s;
+  }
+  .bottom-nav button svg{width:24px;height:24px;}
+  .bottom-nav button:active{transform:scale(.9);}
+  .bottom-nav button.active{color:var(--primary);}
+  .bottom-nav .fab{
+    background:var(--primary);color:#fff;border-radius:50%;width:54px;height:54px;
+    margin-top:-22px;box-shadow:0 6px 16px rgba(0,0,0,.3);
+    font-size:30px;font-weight:300;line-height:1;justify-content:center;
+    transition:transform .15s, box-shadow .15s;
+  }
+  .bottom-nav .fab:active{transform:scale(.92);box-shadow:0 3px 10px rgba(0,0,0,.3);}
+  .bottom-nav .fab.active{color:#fff;}
+
+  /* —— 弹窗 —— */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;
+            align-items:flex-end;justify-content:center;z-index:50;}
+  .modal-bg.show{display:flex;}
+  .modal{background:#fff;width:100%;max-width:430px;border-radius:18px 18px 0 0;
+         padding:18px;max-height:82vh;overflow:auto;}
+  .modal h3{margin:0 0 10px;}
+
+  /* —— 搜索历史 chip —— */
+  .chip{display:inline-block;background:#e9eaec;color:var(--text);border:none;border-radius:999px;
+        padding:6px 13px;font-size:13px;margin:4px 4px 0 0;cursor:pointer;
+        transition:transform .15s, box-shadow .15s;}
+  .chip:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(0,0,0,.12);}
+  .chip.active{background:var(--primary);color:#fff;}
+
+  /* —— 搜索结果：按仓库分组 —— */
+  .wh-group{border:none;border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;background:#fff;
+            box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  .wh-group .wh-name{color:var(--primary);font-weight:600;margin-bottom:6px;}
+  .tag{display:inline-block;background:#eef0f2;border:none;border-radius:6px;
+       padding:3px 9px;font-size:12px;margin:3px 4px 3px 0;color:#374151;}
+
+  .hint{color:var(--muted);font-size:13px;margin:6px 0;}
+</style>
+</head>
+<body>
+
+<div class="phone">
+
+  <!-- ===================== 顶部栏 ===================== -->
+  <header>
+    <div class="brand">仓库管理系统</div>
+    <div class="top-actions">
+      <button onclick="switchTab('search')" title="搜索">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+      <button onclick="simScan()" title="拍照 / 扫码">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===================== 内容区 ===================== -->
+  <main>
+
+    <!-- ---------- 页面：添加物品（默认主页） ---------- -->
+    <section id="page-add" class="page active">
+      <div class="card">
+        <div class="section-title" id="formTitle">添加物品</div>
+
+        <label>物品编号 <span class="required">*</span></label>
+        <input id="f-code" list="lastCodes" />
+        <datalist id="lastCodes"></datalist>
+
+        <label>仓库 <span class="required">*</span></label>
+        <input id="f-warehouse" />
+
+        <div class="grid2">
+          <div>
+            <label>名称 / 类别</label>
+            <input id="f-name" />
+          </div>
+          <div>
+            <label>入库时间（精确到分）</label>
+            <input id="f-time" type="datetime-local" />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label>重量</label>
+            <div class="row">
+              <input id="f-weight" type="number" style="flex:1" />
+              <select id="f-weightUnit" style="width:92px">
+                <option>kg</option><option>g</option><option>吨</option><option>斤</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label>数量</label>
+            <div class="row">
+              <input id="f-qty" type="number" style="flex:1" />
+              <select id="f-qtyUnit" style="width:92px">
+                <option>个</option><option>台</option><option>箱</option><option>件</option><option>袋</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px">
+          <button class="btn ghost sm" onclick="simScan()">扫码填编号</button>
+          <button class="btn ghost sm" onclick="document.getElementById('photoInput').click()">拍照</button>
+          <input id="photoInput" type="file" accept="image/*" multiple style="display:none" onchange="addPhotos(this)" />
+        </div>
+        <div id="photoPreview" class="row" style="margin-top:6px"></div>
+
+        <div class="row" style="margin-top:14px">
+          <button class="btn" id="submitBtn" style="flex:1" onclick="submitItem()">保存物品</button>
+          <button class="btn ghost" id="cancelEditBtn" style="display:none" onclick="cancelEdit()">取消</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 页面：已录入物品 ---------- -->
+    <section id="page-items" class="page">
+      <div class="card">
+        <div class="section-title">排序</div>
+        <div id="sortChips" class="row"></div>
+      </div>
+      <div class="section-title">已录入物品</div>
+      <div id="itemList" class="items"></div>
+    </section>
+
+    <!-- ---------- 页面：提问搜索（从顶部 🔍 进入） ---------- -->
+    <section id="page-search" class="page">
+      <div class="card">
+        <label>提问查找</label>
+        <input id="searchInput" onkeydown="if(event.key==='Enter')runSearch()" />
+        <div class="row" style="margin-top:8px">
+          <button class="btn" onclick="runSearch()">搜索</button>
+        </div>
+        <div class="section-title">搜索历史</div>
+        <div id="historyBox"></div>
+      </div>
+      <div id="searchResult"></div>
+    </section>
+
+    <!-- ---------- 页面：时间统计（可视化） ---------- -->
+    <section id="page-stats" class="page">
+      <div class="card">
+        <div class="section-title">物品出入库统计</div>
+        <canvas id="chartTrend" height="180"></canvas>
+      </div>
+      <div class="card">
+        <div class="section-title">各仓库当前数量占比</div>
+        <canvas id="chartWh" height="180"></canvas>
+      </div>
+      <div class="card">
+        <div class="section-title">明细</div>
+        <div class="row" style="margin-bottom:8px">
+          <input id="statStart" type="month" value="2025-01" style="flex:1" />
+          <input id="statEnd" type="month" value="2025-12" style="flex:1" />
+          <button class="btn sm" onclick="renderStatList()">查看</button>
+        </div>
+        <div id="statList"></div>
+      </div>
+    </section>
+
+    <!-- ---------- 页面：回收站 ---------- -->
+    <section id="page-trash" class="page">
+      <div class="section-title">回收站</div>
+      <div id="trashList" class="items"></div>
+    </section>
+
+    <!-- ---------- 页面：备份 ---------- -->
+    <section id="page-backup" class="page">
+      <div class="card">
+        <div class="section-title">数据备份与导出</div>
+        <div class="row" style="margin-bottom:10px">
+          <button class="btn" onclick="exportExcel()">导出 Excel</button>
+          <button class="btn ghost" onclick="exportJSON()">导出 JSON</button>
+          <button class="btn ghost" onclick="manualBackup()">手动备份</button>
+        </div>
+        <label>自动备份</label>
+        <div class="row">
+          <select id="autoBackup" style="width:140px" onchange="saveAutoBackup()">
+            <option value="off">关闭</option><option value="daily">每天</option><option value="weekly">每周</option>
+          </select>
+          <span class="hint">按设置把数据库自动拷贝到 backups 文件夹</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===================== 底部导航 ===================== -->
+  <nav class="bottom-nav" id="nav">
+    <button data-page="items">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      已录入
+    </button>
+    <button data-page="stats">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      统计
+    </button>
+    <button data-page="add" class="fab">＋</button>
+    <button data-page="trash">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      回收站
+    </button>
+    <button data-page="backup">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      备份
+    </button>
+  </nav>
+
+</div>
+
+<!-- 物品详情弹窗 -->
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+/* =========================================================
+   前端逻辑。数据存在 Cloudflare D1（serverless SQLite），这里只负责
+   调用 /api/... 接口，并把结果画到页面上。
+   ========================================================= */
+
+const API='/api';
+
+/* ---------- 网络请求小工具（自动带登录 cookie） ---------- */
+async function api(path,opts={}){
+  const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts});
+  if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.error||'请求失败'); }
+  return res.json();
+}
+
+/* ---------- 全局数据（来自后端） ---------- */
+let items=[];          // 全部物品（含已删除，前端按 deleted 区分）
+let movements=[];      // 出入库记录
+let editingId=null;
+let lastCodes=[];
+let pendingPhotos=[];
+
+/* 从后端拉取最新数据 */
+async function loadState(){ const s=await api('/state'); items=s.items; movements=s.movements; }
+
+/* ---------- 搜索历史（存在本机浏览器，按设备独立） ---------- */
+let searchHistory=[];
+try{ searchHistory=JSON.parse(localStorage.getItem('searchHistory')||'[]'); }catch(e){}
+function saveHistory(){ localStorage.setItem('searchHistory',JSON.stringify(searchHistory)); }
+
+/* ---------- 2) 页面切换（底部导航 + 顶部搜索） ---------- */
+function switchTab(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active', b.dataset.page===name));
+  if(name==='items') renderItems();
+  if(name==='trash') renderTrash();
+  if(name==='stats') renderCharts();
+  if(name==='backup') loadAutoBackup();
+}
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>switchTab(b.dataset.page));
+
+/* ---------- 3) 添加物品页 ---------- */
+function nowMinute(){
+  const d=new Date(); d.setSeconds(0); d.setMilliseconds(0);
+  d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+  return d.toISOString().slice(0,16);
+}
+document.getElementById('f-time').value = nowMinute();
+
+/* ---------- 排序（可单/多选，升降序） ---------- */
+const sortFields=[
+  {key:'time',label:'入库时间'},
+  {key:'qty',label:'数量'},
+  {key:'code',label:'编码'},
+  {key:'warehouse',label:'仓库'}
+];
+let sortRules=[];
+function renderSortChips(){
+  document.getElementById('sortChips').innerHTML=sortFields.map(f=>{
+    const r=sortRules.find(x=>x.key===f.key);
+    const arrow=r?(r.dir==='asc'?'↑':'↓'):'↕';
+    return `<span class="chip${r?' active':''}" data-key="${f.key}">${f.label} ${arrow}</span>`;
+  }).join('');
+}
+document.getElementById('sortChips').addEventListener('click',e=>{
+  const t=e.target.closest('[data-key]'); if(!t) return;
+  const key=t.dataset.key;
+  const i=sortRules.findIndex(x=>x.key===key);
+  if(i<0) sortRules.push({key,dir:'asc'});
+  else{ const r=sortRules[i]; if(r.dir==='asc') r.dir='desc'; else sortRules.splice(i,1); }
+  renderSortChips(); renderItems();
+});
+
+function renderItems(){
+  const box=document.getElementById('itemList');
+  let list=items.filter(i=>!i.deleted);
+  if(sortRules.length){
+    list.sort((a,b)=>{
+      for(const r of sortRules){
+        let va=a[r.key], vb=b[r.key];
+        if(r.key==='time'){ va=new Date((a.time||'').replace(/-/g,'/')).getTime(); vb=new Date((b.time||'').replace(/-/g,'/')).getTime(); }
+        else if(r.key==='qty'){ va=+(a[r.key]||0); vb=+(b[r.key]||0); }
+        else {
+          if(typeof va==='string') va=va.toLowerCase();
+          if(typeof vb==='string') vb=vb.toLowerCase();
+          if(va==null) va='';
+          if(vb==null) vb='';
+        }
+        if(va<vb) return r.dir==='asc'?-1:1;
+        if(va>vb) return r.dir==='asc'?1:-1;
+      }
+      return 0;
+    });
+  }
+  box.innerHTML = list.map(i=>`
+    <div class="item" onclick="openItem(${i.id})">
+      <div class="code">${i.code}</div>
+      <div class="wh">📍 ${i.warehouse}</div>
+      <div class="meta">${i.name||'—'} · ${i.qty}${i.qtyUnit}</div>
+      <div class="meta">入库：${(i.time||'').replace('T',' ')}</div>
+      ${i.images[0]?`<img src="${i.images[0]}">`:''}
+    </div>`).join('') || '<p class="hint">还没有物品，点中间的 ＋ 添加。</p>';
+  lastCodes=[...new Set(items.map(i=>i.code))];
+  document.getElementById('lastCodes').innerHTML=lastCodes.map(c=>`<option value="${c}">`).join('');
+}
+
+async function submitItem(){
+  const wasEdit=!!editingId;
+  const code=document.getElementById('f-code').value.trim();
+  const wh=document.getElementById('f-warehouse').value.trim();
+  if(!code||!wh){ alert('编码 和 仓库 为必填项！'); return; }
+  const data={
+    code,warehouse:wh,
+    name:document.getElementById('f-name').value.trim(),
+    time:document.getElementById('f-time').value.replace('T',' '),
+    weight:document.getElementById('f-weight').value,
+    weightUnit:document.getElementById('f-weightUnit').value,
+    qty:document.getElementById('f-qty').value,
+    qtyUnit:document.getElementById('f-qtyUnit').value,
+    images: wasEdit ? (items.find(i=>i.id===editingId).images||[]) : pendingPhotos.slice()
+  };
+  try{
+    if(editingId){
+      await api('/items/'+editingId,{method:'PUT',body:JSON.stringify(data)});
+    }else{
+      await api('/items',{method:'POST',body:JSON.stringify(data)});
+    }
+    await loadState();
+    pendingPhotos=[]; document.getElementById('photoPreview').innerHTML='';
+    resetForm(); renderItems();
+    if(wasEdit) switchTab('items');   // 编辑后回到已录入；新增则留在添加页继续录
+  }catch(e){ alert(e.message); }
+}
+function resetForm(){
+  ['f-code','f-warehouse','f-name','f-weight','f-qty'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-time').value=nowMinute();
+  editingId=null;
+  document.getElementById('formTitle').textContent='添加物品';
+  document.getElementById('submitBtn').textContent='保存物品';
+  document.getElementById('cancelEditBtn').style.display='none';
+}
+function cancelEdit(){ resetForm(); }
+
+function openItem(id){
+  const i=items.find(x=>x.id===id);
+  document.getElementById('modal').innerHTML=`
+    <h3>${i.code} · ${i.warehouse}</h3>
+    <p class="meta">名称：${i.name||'—'}</p>
+    <p class="meta">数量：${i.qty}${i.qtyUnit} ｜ 重量：${i.weight}${i.weightUnit}</p>
+    <p class="meta">入库：${(i.time||'').replace('T',' ')}</p>
+    ${i.images.map(s=>`<img src="${s}" style="max-width:100%;border-radius:8px;margin:6px 0">`).join('')}
+    <div class="row" style="margin-top:12px">
+      <button class="btn" onclick="editItem(${i.id})">编辑</button>
+      <button class="btn ghost" onclick="takeOut(${i.id})">取出</button>
+      <button class="btn danger" onclick="delItem(${i.id})">删除</button>
+      <button class="btn ghost" onclick="closeModal()">关闭</button>
+    </div>`;
+  document.getElementById('modalBg').classList.add('show');
+}
+function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
+
+function editItem(id){
+  const i=items.find(x=>x.id===id);
+  editingId=id;
+  document.getElementById('f-code').value=i.code;
+  document.getElementById('f-warehouse').value=i.warehouse;
+  document.getElementById('f-name').value=i.name||'';
+  document.getElementById('f-time').value=(i.time||'').replace(' ','T');
+  document.getElementById('f-weight').value=i.weight;
+  document.getElementById('f-weightUnit').value=i.weightUnit;
+  document.getElementById('f-qty').value=i.qty;
+  document.getElementById('f-qtyUnit').value=i.qtyUnit;
+  document.getElementById('formTitle').textContent='编辑物品';
+  document.getElementById('submitBtn').textContent='保存修改';
+  document.getElementById('cancelEditBtn').style.display='inline-block';
+  closeModal(); switchTab('add');
+  window.scrollTo({top:0});
+}
+async function takeOut(id){
+  const i=items.find(x=>x.id===id);
+  const n=prompt('从「'+i.warehouse+'」取出多少个？', i.qty);
+  if(n===null) return;
+  const take=Math.min(+n||0, +i.qty||0);
+  if(take<=0) return;
+  try{
+    await api('/items/'+id+'/takeout',{method:'POST',body:JSON.stringify({qty:take})});
+    await loadState(); closeModal(); renderItems();
+  }catch(e){ alert(e.message); }
+}
+async function delItem(id){
+  if(!confirm('确定删除？会进入回收站，可恢复。')) return;
+  try{ await api('/items/'+id,{method:'DELETE'}); await loadState(); closeModal(); renderItems(); }
+  catch(e){ alert(e.message); }
+}
+
+/* ---------- 4) 拍照 / 扫码 ---------- */
+function addPhotos(input){
+  [...input.files].forEach(f=>{
+    const r=new FileReader();
+    r.onload=()=>{ pendingPhotos.push(r.result); showPreview(); };
+    r.readAsDataURL(f);
+  });
+  input.value='';
+}
+function showPreview(){
+  document.getElementById('photoPreview').innerHTML=pendingPhotos.map(()=>
+    `<div style="width:56px;height:56px;border-radius:8px;background:#e5e7eb"></div>`).join('');
+}
+function simScan(){
+  alert('真实环境会打开摄像头扫码，识别到的编号自动填入“物品编号”框。');
+  document.getElementById('f-code').value='SCAN-'+Date.now().toString().slice(-4);
+}
+
+/* ---------- 5) 提问搜索（支持关键词 / 数量 / 时间） ---------- */
+function runSearch(){
+  const q=document.getElementById('searchInput').value.trim();
+  if(!q){ alert('请输入关键词、数量或时间。'); return; }
+  if(!searchHistory.includes(q)){ searchHistory.unshift(q); searchHistory=searchHistory.slice(0,10); saveHistory(); renderHistory(); }
+
+  const res=parseQuery(q);
+  const box=document.getElementById('searchResult');
+  if(!res.length){ box.innerHTML='<p class="hint">没有匹配的物品。</p>'; return; }
+  const byWh={};
+  res.forEach(r=>(byWh[r.item.warehouse]=byWh[r.item.warehouse]||[]).push(r));
+  box.innerHTML=`<div class="hint">匹配到 ${res.length} 条，分布在 ${Object.keys(byWh).length} 个仓库：</div>`+
+    Object.entries(byWh).map(([wh,arr])=>`
+      <div class="wh-group">
+        <div class="wh-name">📍 ${wh}</div>
+        ${arr.map(r=>{const i=r.item;return `
+          <div style="margin:6px 0">
+            <b>${i.name||i.code}</b> ｜ ${i.qty}${i.qtyUnit} ｜ ${i.weight}${i.weightUnit} ｜ ${(i.time||'').replace('T',' ')}
+            ${r.kind?`<span class="tag">${r.kind==='in'?'入库':'出库'}</span>`:''}
+            <div>${i.code&&i.code!==i.name?`<span class="tag">编号 ${i.code}</span>`:''}</div>
+          </div>`;}).join('')}
+      </div>`).join('');
+}
+
+/* 解析：返回 [{item, kind}]，kind 为 'in'/'out'（时间查询时才有） */
+function parseQuery(q){
+  // 1) 时间查询：2025-01-01 / 2025年1月 / 可加 “入库”“出库”
+  const dateMatch=q.match(/(\d{4})[-/年](\d{1,2})(?:[-/月](\d{1,2})日?)?/);
+  if(dateMatch){
+    const y=dateMatch[1], m=dateMatch[2].padStart(2,'0'), d=dateMatch[3];
+    const prefix=d?`${y}-${m}-${d.padStart(2,'0')}`:`${y}-${m}`;
+    const isOut=/出库/.test(q), isIn=/入库/.test(q);
+    const out=[];
+    if(!isOut) items.forEach(i=>{ if(!i.deleted && (i.time||'').slice(0,prefix.length)===prefix) out.push({item:i,kind:'in'}); });
+    if(!isIn) movements.forEach(mv=>{ if(mv.type==='out' && (mv.time||'').slice(0,prefix.length)===prefix){
+        const it=items.find(x=>x.id===mv.itemId); if(it&&!it.deleted) out.push({item:it,kind:'out'});
+    }});
+    return out;
+  }
+  // 2) 数量查询：数量1 / 数量80及以上 / 数量50以下
+  const numMatch=q.match(/数量\s*(\d+)\s*(及以上|以上|及往上|往上|及以下|以下|及往下|往下)?/);
+  if(numMatch){
+    const n=+numMatch[1]; const mod=numMatch[2];
+    let op='eq';
+    if(mod&&(mod.includes('以上')||mod.includes('往上'))) op='gte';
+    else if(mod&&(mod.includes('以下')||mod.includes('往下'))) op='lte';
+    return items.filter(i=>!i.deleted && (
+      op==='eq'? +i.qty===n : op==='gte'? +i.qty>=n : +i.qty<=n)).map(i=>({item:i,kind:null}));
+  }
+  // 3) 关键词
+  const kw=q.toLowerCase();
+  return items.filter(i=>!i.deleted && [i.name,i.code,i.warehouse]
+    .some(f=>(f||'').toLowerCase().includes(kw))).map(i=>({item:i,kind:null}));
+}
+function renderHistory(){
+  document.getElementById('historyBox').innerHTML=searchHistory.length
+    ? searchHistory.map(h=>`<span class="chip" onclick="document.getElementById('searchInput').value='${h.replace(/'/g,"\\'")}';runSearch()">${h}</span>`).join('')
+    : '<span class="hint">暂无历史</span>';
+}
+
+/* ---------- 6) 时间统计（可视化） ---------- */
+let chartTrend, chartWh;
+function renderCharts(){
+  if(typeof Chart==='undefined'){ alert('图表库未加载（需要联网）。'); return; }
+
+  const palette=['#2563eb','#16a34a','#f59e0b','#dc2626','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#0d9488','#be185d','#15803d'];
+
+  // 不堆叠：每根柱子 = 某分钟 + 某物品 + 某仓库 的出入库数量；
+  // 入库为正(向上)、出库为负(向下)；颜色按物品编码
+  const map={};
+  const codeSet=new Set();
+  function addMove(code,wh,day,qty,dir){
+    const key=code+'|'+wh;
+    if(!map[key]) map[key]={code,wh,days:{}};
+    if(!map[key].days[day]) map[key].days[day]={in:0,out:0};
+    map[key].days[day][dir]+=qty;
+    codeSet.add(code);
+  }
+  items.filter(i=>!i.deleted).forEach(i=>{
+    const day=i.time?i.time.slice(0,16):'';
+    if(day && i.qty) addMove(i.code,i.warehouse,day,+i.qty,'in');
+  });
+  movements.filter(m=>m.type==='out').forEach(m=>{
+    if(!m.code) return;
+    const day=m.time?m.time.slice(0,16):'';
+    if(day) addMove(m.code,m.warehouse,day,+m.qty,'out');
+  });
+  const codeColor={};
+  [...codeSet].forEach((c,i)=>codeColor[c]=palette[i%palette.length]);
+
+  const days=[...new Set(Object.values(map).flatMap(o=>Object.keys(o.days)))].sort();
+  const datasets=[];
+  Object.values(map).forEach(o=>{
+    const color=codeColor[o.code];
+    datasets.push({
+      label:o.code+' · '+o.wh+' 入库',
+      data:days.map(d=>o.days[d]?o.days[d].in:0),
+      backgroundColor:color,borderColor:color,
+      _code:o.code,_wh:o.wh,_dir:'入库'
+    });
+    datasets.push({
+      label:o.code+' · '+o.wh+' 出库',
+      data:days.map(d=>-(o.days[d]?o.days[d].out:0)),
+      backgroundColor:color,borderColor:color,
+      _code:o.code,_wh:o.wh,_dir:'出库'
+    });
+  });
+
+  if(chartTrend) chartTrend.destroy();
+  chartTrend=new Chart(document.getElementById('chartTrend'),{
+    type:'bar',
+    data:{labels:days, datasets},
+    options:{
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:(ctx)=>{
+          const d=ctx.dataset;
+          return `${d._code} ｜ ${d._wh} ｜ ${d._dir} ${Math.abs(ctx.parsed.y)}`;
+        }}}
+      },
+      scales:{
+        x:{title:{display:true,text:'时间（按分）'}},
+        y:{title:{display:true,text:'数量'},ticks:{callback:v=>Math.abs(v)}}
+      }
+    }
+  });
+
+  // 各仓库当前数量占比
+  const whAgg={};
+  items.filter(i=>!i.deleted).forEach(i=>{ whAgg[i.warehouse]=(whAgg[i.warehouse]||0)+(+i.qty||0); });
+  const whNames=Object.keys(whAgg);
+  const whData=whNames.map(w=>whAgg[w]);
+  const whPalette=['#2563eb','#16a34a','#f59e0b','#dc2626','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#0d9488'];
+  if(chartWh) chartWh.destroy();
+  chartWh=new Chart(document.getElementById('chartWh'),{
+    type:'doughnut',
+    data:{labels:whNames,datasets:[{data:whData,backgroundColor:whNames.map((_,i)=>whPalette[i%whPalette.length])}]},
+    options:{plugins:{legend:{position:'bottom'}}}
+  });
+}
+function renderStatList(){
+  const s=document.getElementById('statStart').value, e=document.getElementById('statEnd').value;
+  if(!s||!e) return;
+  const list=movements.filter(m=>(m.time||'').slice(0,7)>=s && (m.time||'').slice(0,7)<=e);
+  document.getElementById('statList').innerHTML=list.length
+    ? list.map(m=>`
+        <div class="wh-group">
+          <span class="tag">${m.type==='in'?'入库':'出库'}</span>
+          <b>${m.name}</b> ｜ ${m.warehouse} ｜ ${m.qty}${m.qtyUnit} ｜ ${(m.time||'').replace('T',' ')}
+        </div>`).join('')
+    : '<p class="hint">该区间没有出入库记录。</p>';
+}
+
+/* ---------- 7) 回收站 / 备份 ---------- */
+function renderTrash(){
+  const box=document.getElementById('trashList');
+  const list=items.filter(i=>i.deleted);
+  box.innerHTML=list.length
+    ? list.map(i=>`
+      <div class="item" onclick="openTrashItem(${i.id})">
+        <div class="code">${i.code}</div>
+        <div class="wh">📍 ${i.warehouse}</div>
+        <div class="meta">${i.name||'—'} · ${i.qty}${i.qtyUnit}</div>
+        <div class="meta">入库：${(i.time||'').replace('T',' ')}</div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn sm" onclick="event.stopPropagation();restore(${i.id})">恢复</button>
+        </div>
+      </div>`).join('')
+    : '<p class="hint">回收站是空的。</p>';
+}
+function openTrashItem(id){
+  const i=items.find(x=>x.id===id);
+  document.getElementById('modal').innerHTML=`
+    <h3>${i.code} · ${i.warehouse}</h3>
+    <p class="meta">名称：${i.name||'—'}</p>
+    <p class="meta">数量：${i.qty}${i.qtyUnit} ｜ 重量：${i.weight}${i.weightUnit}</p>
+    <p class="meta">入库：${(i.time||'').replace('T',' ')}</p>
+    ${i.images.map(s=>`<img src="${s}" style="max-width:100%;border-radius:8px;margin:6px 0">`).join('')}
+    <div class="row" style="margin-top:12px">
+      <button class="btn" onclick="restore(${i.id});closeModal()">恢复</button>
+      <button class="btn ghost" onclick="closeModal()">关闭</button>
+    </div>`;
+  document.getElementById('modalBg').classList.add('show');
+}
+async function restore(id){
+  try{ await api('/items/'+id+'/restore',{method:'POST'}); await loadState(); renderTrash(); renderItems(); }
+  catch(e){ alert(e.message); }
+}
+
+async function exportJSON(){
+  try{ const s=await api('/export'); download(new Blob([JSON.stringify(s,null,2)],{type:'application/json'}),'仓库数据.json'); }
+  catch(e){ alert(e.message); }
+}
+function exportExcel(){
+  if(typeof XLSX==='undefined'){ alert('Excel 库未加载（需联网）。可先点“导出 JSON”。'); return; }
+  const rows=items.filter(i=>!i.deleted).map(i=>({
+    编号:i.code,仓库:i.warehouse,名称:i.name,数量:i.qty,数量单位:i.qtyUnit,
+    重量:i.weight,重量单位:i.weightUnit,入库时间:i.time
+  }));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'物品');
+  XLSX.writeFile(wb,'仓库数据.xlsx');
+}
+async function manualBackup(){ await exportJSON(); alert('已手动备份（下载 JSON）。服务端也会按“自动备份”设置拷贝数据库文件。'); }
+function download(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); }
+
+/* 自动备份：读取 / 保存设置 */
+async function loadAutoBackup(){
+  try{ const r=await api('/auto-backup'); document.getElementById('autoBackup').value=r.freq; }catch(e){}
+}
+async function saveAutoBackup(){
+  const freq=document.getElementById('autoBackup').value;
+  try{ await api('/auto-backup',{method:'POST',body:JSON.stringify({freq})}); }
+  catch(e){ alert(e.message); }
+}
+
+/* ---------- 初始化：直接载入数据（无需登录） ---------- */
+(async function init(){
+  renderSortChips();
+  document.getElementById('f-time').value=nowMinute();
+  try{ await loadState(); renderItems(); }
+  catch(e){ alert(e.message); }
+})();
+</script>
+</body>
+</html>

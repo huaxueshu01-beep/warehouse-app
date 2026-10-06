@@ -1,0 +1,13 @@
+{
+  "name": "warehouse-system",
+  "version": "1.0.0",
+  "description": "轻量仓库管理系统（Node + Express + SQLite），前后端一体，手机/电脑共用一份数据。",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "better-sqlite3": "^11.3.0"
+  }
+}

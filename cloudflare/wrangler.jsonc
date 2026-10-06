@@ -1,0 +1,18 @@
+{
+  // Cloudflare Pages + D1 配置
+  "name": "warehouse-cloudflare",
+  "pages_build_output_dir": ".",           // index.html 在项目根目录
+  "compatibility_date": "2025-10-01",
+  "d1_databases": [
+    {
+      "binding": "DB",                     // 在函数中用 context.env.DB 访问
+      "database_name": "warehouse",
+      // 下面这行要替换成你自己的 D1 数据库 ID：
+      //   1) 安装 wrangler： npm install -g wrangler
+      //   2) 登录：        wrangler login
+      //   3) 建库：        wrangler d1 create warehouse
+      //   4) 把命令输出的 id 填到下面
+      "database_id": "REPLACE_WITH_YOUR_D1_ID"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "warehouse-cloudflare",
+  "version": "1.0.0",
+  "private": true,
+  "description": "仓库物品管理系统 —— Cloudflare Pages + D1 版本",
+  "scripts": {
+    "dev": "wrangler pages dev . --d1 DB=warehouse",
+    "deploy": "wrangler pages deploy ."
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

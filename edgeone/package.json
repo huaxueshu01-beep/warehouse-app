@@ -1,0 +1,11 @@
+{
+  "name": "warehouse-edgeone",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "仓库物品管理系统 —— EdgeOne Makers 版本（Blob 存储，无需数据库）",
+  "dependencies": {
+    "express": "^4.19.2",
+    "@edgeone/pages-blob": "^0.0.14"
+  }
+}
