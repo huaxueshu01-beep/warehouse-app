@@ -6,33 +6,17 @@
    无需登录：所有人可直接使用。
    ========================================================= */
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS items (
-  id TEXT PRIMARY KEY,
-  code TEXT, warehouse TEXT, name TEXT,
-  weight TEXT, weight_unit TEXT,
-  qty REAL, qty_unit TEXT,
-  time TEXT, images TEXT,
-  deleted INTEGER DEFAULT 0,
-  created_at TEXT, updated_at TEXT
-);
-CREATE TABLE IF NOT EXISTS movements (
-  id TEXT PRIMARY KEY,
-  type TEXT, item_id TEXT, code TEXT, name TEXT,
-  warehouse TEXT, qty REAL, qty_unit TEXT, time TEXT
-);
-CREATE TABLE IF NOT EXISTS settings (
-  key TEXT PRIMARY KEY, value TEXT
-);
-CREATE TABLE IF NOT EXISTS backups (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ts TEXT, data TEXT
-);
-`;
+/* 每个建表语句单独成一行执行，避免 D1 的 db.exec() 把多行/多语句模板字符串截断 */
+const SCHEMA_STMTS = [
+  `CREATE TABLE IF NOT EXISTS items (id TEXT PRIMARY KEY, code TEXT, warehouse TEXT, name TEXT, weight TEXT, weight_unit TEXT, qty REAL, qty_unit TEXT, time TEXT, images TEXT, deleted INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT)`,
+  `CREATE TABLE IF NOT EXISTS movements (id TEXT PRIMARY KEY, type TEXT, item_id TEXT, code TEXT, name TEXT, warehouse TEXT, qty REAL, qty_unit TEXT, time TEXT)`,
+  `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`,
+  `CREATE TABLE IF NOT EXISTS backups (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, data TEXT)`,
+];
 
 /* 确保表存在（幂等，每个冷启动第一次请求时执行） */
 async function ensureSchema(db) {
-  await db.exec(SCHEMA);
+  for (const sql of SCHEMA_STMTS) await db.exec(sql);
 }
 
 /* 标准 JSON 响应 */
