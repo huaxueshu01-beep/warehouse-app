@@ -1,11 +1,16 @@
 {
-  // Cloudflare Pages + D1 配置
+  // Cloudflare Worker + Static Assets + D1 配置
+  // 这是「最新推荐」形态：一个 Worker 脚本既处理 /api/*，又通过 Static Assets 托管前端。
   "name": "warehouse-cloudflare",
-  "pages_build_output_dir": ".",           // index.html 在项目根目录
-  "compatibility_date": "2025-10-01",
+  "main": "src/worker.js",                 // Worker 入口
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",               // 静态资源（index.html 等）所在目录
+    "binding": "ASSETS"                    // 在代码中用 env.ASSETS 访问
+  },
   "d1_databases": [
     {
-      "binding": "DB",                     // 在函数中用 context.env.DB 访问
+      "binding": "DB",                     // 在代码中用 env.DB 访问
       "database_name": "warehouse",
       "database_id": "e693e4bd-85b5-4f06-8f00-0a8d09c5a8ab"
     }
