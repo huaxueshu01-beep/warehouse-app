@@ -135,12 +135,13 @@ git push
 ├── public/index.html        # 前端源码（两套部署共用）
 ├── server.js / db.js        # 原始本地 Node 版（参考用）
 ├── package.json
-├── cloudflare/              # Cloudflare 部署版（推荐）
-│   ├── index.html
-│   ├── wrangler.jsonc
+├── cloudflare/              # Cloudflare 部署版（推荐：Worker + Static Assets + D1）
+│   ├── public/index.html    # 前端（无需改动，API 调 /api）
+│   ├── src/worker.js        # 后端：/api/* 接口 + 托管静态资源，数据存 D1
+│   ├── wrangler.jsonc       # Worker + D1 + 静态资源配置（填 database_id）
 │   ├── package.json
 │   ├── 部署教程.md
-│   └── functions/api/[[route]].js
+│   └── Git自动部署教程.md
 └── edgeone/                 # EdgeOne 部署版（国内访问更稳）
     ├── index.html
     ├── package.json
